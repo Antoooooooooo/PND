@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ultimate PND Sandbox Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: #0a0a0a; color: #0f0;
+      font-family: monospace;
+      overflow: hidden;
+    }
+    #main {
+      width: 100vw; height: 100vh; display: flex; flex-direction: column;
+    }
+    #chartWrap {
+      flex: 1; position: relative; min-height: 60vh; background: #111;
+      border-bottom: 2px solid #222;
+    }
+    #chart {
+      width: 100%; height: 100%;
+      display: block; background: #111;
+    }
+    #priceLabel {
+      position: absolute; left: 12px; top: 8px;
+      background: #111b; color: #0f0; font-weight: bold; font-size: 2rem;
+      padding: 4px 16px; border-radius: 8px; z-index: 10;
+      border: 1.5px solid #0f0;
+      box-shadow: 0 2px 6px #000c;
+      user-select: none;
+      letter-spacing: 1px;
+    }
+    #controls {
+      background: #090909e6;
+      color: #0f0;
+      padding: 12px 0 8px 0;
+      display: flex; flex-wrap: wrap;
+      justify-content: space-around; align-items: flex-end;
+      box-shadow: 0 -2px 12px #000e;
+      z-index: 100;
+    }
+    .ctrl-section {
+      margin: 5px 12px; min-width: 175px; max-width: 235px;
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: 7px;
+    }
+    .ctrl-section label { font-size: 0.98em; }
+    button, select, input[type=range], input[type=number] {
+      background: #111; color: #0f0; border: 1.3px solid #0f0;
+      border-radius: 5px; padding: 7px 10px; margin: 2px 0;
+      font-size: 1em; min-width: 48px;
+      font-family: monospace;
+    }
+    button { cursor: pointer; }
+    .trade-btns button { min-width: 90px; font-weight: bold; }
+    .toggle-btn { margin-top: 5px; }
+    #logToggle, #hidePanels {
+      position: absolute; right: 15px; top: 15px; z-index: 150;
+      background: #111; color: #0f0; border: 1.5px solid #0f0; border-radius: 4px;
+      font-size: 1em; padding: 6px 12px; cursor: pointer;
+      opacity: 0.8; transition: 0.2s;
+    }
+    #logPanel {
+      position: fixed; right: 24px; top: 60px; width: 310px; height: 380px;
+      background: #060606ef; color: #0f0; border: 2px solid #0f0; border-radius: 12px;
+      font-size: 0.98em; box-shadow: 0 6px 16px #000a;
+      z-index: 200; overflow-y: auto; display: none; padding: 13px 12px 6px 12px;
+    }
+    .log-title { font-size: 1.08em; font-weight: bold; letter-spacing: 1px; margin-bottom: 8px; }
+    .log-entry { font-size: 0.97em; margin-bottom: 2.5px; }
+    .log-liq { color: #f40; font-weight: bold; }
+    .log-bot { color: #0af; }
+    .log-retail { color: #fa0; }
+    .log-user { color: #0f0; }
+    @media (max-width: 900px) {
+      #logPanel { width: 97vw; right: 2vw; top: 6vh; height: 320px; font-size: 1em;}
+      .ctrl-section { max-width: 96vw; min-width: 135px; }
+    }
+    @media (max-width: 750px) {
+      #controls { flex-direction: column; gap: 8px; align-items: stretch; }
+      #logPanel { width: 98vw; right: 1vw; top: 2vh; }
+    }
+    @media (max-width: 550px) {
+      #main { font-size: 0.98em; }
+      #logPanel { top: 2vh; font-size: 1em; }
+    }
+  </style>
+</head>
+<body>
+<div id="main">
+  <div id="chartWrap">
+    <canvas id="chart"></canvas>
+    <div id="priceLabel">$100.00</div>
+    <button id="logToggle" onclick="toggleLog()">🧾 Trades & Liqs</button>
+  </div>
+  <div id="controls">
+    <div class="ctrl-section">
+      <label>Pump & Dump:</label>
+      <button onclick="pump()">📈 Pump</button>
+      <button onclick="dump()">📉 Dump</button>
+      <button onclick="bigOrder('buy')">💰 Big Buy</button>
+      <button onclick="bigOrder('sell')">💸 Big Sell</button>
+    </div>
+    <div class="ctrl-section">
+      <label>Market Sim:</label>
+      <button onclick="togglePlay()">⏯ Play/Pause</button>
+      <label>Zoom: <input type="range" id="zoomSlider" min="5" max="200" value="25"></label>
+      <label>Volatility: <input type="range" id="volSlider" min="0.3" max="5" step="0.1" value="1"></label>
+      <label>Timeframe:
+        <select id="tfSelect">
+          <option value="700">1s</option>
+          <option value="1500">3s</option>
+          <option value="3500">7s</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="smaToggle"> Show SMA</label>
+    </div>
+    <div class="ctrl-section">
+      <label>Futures (50x):</label>
+      <div class="trade-btns">
+        <button onclick="openTrade('long')">🔼 Long</button>
+        <button onclick="openTrade('short')">🔽 Short</button>
+        <button onclick="closeTrade()">❌ Close</button>
+      </div>
+      <div>Entry: <span id="entryDisp">--</span> | Liq: <span id="liqDisp">--</span></div>
+      <div>PnL: <span id="pnlDisp">0.00</span></div>
+      <div>☠️ <span id="liqMsg"></span></div>
+    </div>
+    <div class="ctrl-section">
+      <label>Market Status:</label>
+      <div>Sentiment: <span id="sentiment">Neutral</span></div>
+      <div>Retail: <span id="retail">Stable</span></div>
+      <div>Liquidity: <span id="liquidity">Normal</span></div>
+    </div>
+    <div class="ctrl-section">
+      <button onclick="saveGame()">💾 Save</button>
+      <button onclick="loadGame()">📂 Load</button>
+      <button onclick="resetSim()">🔄 Reset</button>
+      <button id="hidePanels" onclick="togglePanels()" style="margin-top:8px;">👁️ Hide Controls</button>
+    </div>
+  </div>
+  <div id="logPanel"></div>
+</div>
+<script>
+  // --- Core State ---
+  let price = 100, playing = true, zoom = 25, volatility = 1, timeframe = 700, leverage = 50;
+  let candles = [], volume = [], SMA = [], bots = [], logs = [];
+  let entry = null, futures = "none", pnl = 0, liq = null, liqMsg = "";
+  let sentiment = 0, retail = 0, liquidity = 1;
+  let showSMA = false, showPanels = true;
+  let autoScrollLog = true;
+  const maxCandles = 330;
+
+  // --- DOM Elements ---
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const priceLabel = document.getElementById('priceLabel');
+  const zoomSlider = document.getElementById('zoomSlider');
+  const volSlider = document.getElementById('volSlider');
+  const tfSelect = document.getElementById('tfSelect');
+  const smaToggle = document.getElementById('smaToggle');
+  const logPanel = document.getElementById('logPanel');
+  const entryDisp = document.getElementById('entryDisp');
+  const liqDisp = document.getElementById('liqDisp');
+  const pnlDisp = document.getElementById('pnlDisp');
+  const liqMsgDisp = document.getElementById('liqMsg');
+  const sentimentDisp = document.getElementById('sentiment');
+  const retailDisp = document.getElementById('retail');
+  const liquidityDisp = document.getElementById('liquidity');
+  const controlsDiv = document.getElementById('controls');
+  const hidePanelsBtn = document.getElementById('hidePanels');
+
+  // --- UI Logic ---
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = document.getElementById('chartWrap').offsetHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function y(val) {
+    let range = price * (zoom / 100);
+    return canvas.height - ((val - (price - range)) / (2 * range)) * canvas.height;
+  }
+
+  function drawGrid() {
+    ctx.strokeStyle = '#233'; ctx.lineWidth = 1;
+    ctx.font = "13px monospace";
+    let lines = 6;
+    let range = price * (zoom / 100);
+    for (let i = 0; i <= lines; ++i) {
+      let v = price - range + (2 * range) * (i / lines);
+      let yv = y(v);
+      ctx.beginPath();
+      ctx.moveTo(0, yv); ctx.lineTo(canvas.width, yv); ctx.stroke();
+      ctx.fillStyle = "#0f0"; ctx.fillText("$" + v.toFixed(2), 3, yv - 2);
+    }
+  }
+
+  function drawCandles() {
+    const w = 7;
+    const view = candles.slice(-Math.floor(canvas.width / w));
+    view.forEach((c, i) => {
+      const x = i * w;
+      const col = c.c >= c.o ? "#0f0" : "#f00";
+      ctx.strokeStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(x + w/2, y(c.h));
+      ctx.lineTo(x + w/2, y(c.l));
+      ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y(Math.max(c.o, c.c)), w-2, Math.max(1, Math.abs(y(c.o) - y(c.c))));
+    });
+  }
+
+  function drawVolume() {
+    const w = 7;
+    const view = volume.slice(-Math.floor(canvas.width / w));
+    view.forEach((v, i) => {
+      const x = i * w;
+      ctx.fillStyle = v.color;
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(x, canvas.height - 26, w-2, -v.v/2);
+      ctx.globalAlpha = 1.0;
+    });
+  }
+
+  function drawSMA() {
+    if (!showSMA) return;
+    ctx.strokeStyle = "#0fa";
+    ctx.beginPath();
+    let w = 7;
+    const view = SMA.slice(-Math.floor(canvas.width / w));
+    view.forEach((s, i) => {
+      const x = i * w + w/2;
+      if (i === 0) ctx.moveTo(x, y(s));
+      else ctx.lineTo(x, y(s));
+    });
+    ctx.stroke();
+  }
+
+  function updateChart() {
+    resizeCanvas();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+    drawVolume();
+    drawCandles();
+    drawSMA();
+    priceLabel.textContent = "$" + price.toFixed(2);
+  }
+
+  // --- Main Sim Loop ---
+  function newCandle(vol=0) {
+    let c = { o: price, h: price, l: price, c: price };
+    candles.push(c);
+    volume.push({ v: vol, color: "#0f0" });
+    if (candles.length > maxCandles) candles.shift(), volume.shift();
+    updateSMA();
+  }
+
+  function updateCandle(vol=0) {
+    let c = candles[candles.length-1];
+    c.h = Math.max(c.h, price);
+    c.l = Math.min(c.l, price);
+    c.c = price;
+    volume[volume.length-1].v += vol;
+  }
+
+  function updateSMA() {
+    let N = 12;
+    let sum = 0;
+    let arr = candles.slice(-N);
+    if (arr.length < N) { SMA.push(price); return; }
+    for (let i=0; i<N; ++i) sum += arr[i].c;
+    SMA.push(sum/N);
+    if (SMA.length > maxCandles) SMA.shift();
+  }
+
+  function simulateMove(direction=null, big=0) {
+    if (!playing) return;
+    // Sentiment, retail, spoof, liquidity
+    sentiment = Math.random();
+    retail = Math.random();
+    liquidity = 1 + (Math.random()-0.5)*0.6;
+    sentimentDisp.textContent = sentiment > 0.7 ? "Bullish 🟢" : sentiment < 0.3 ? "Bearish 🔴" : "Neutral";
+    retailDisp.textContent = retail > 0.7 ? "FOMO 🟢" : retail < 0.3 ? "FUD 🔴" : "Stable";
+    liquidityDisp.textContent = liquidity < 0.9 ? "Low" : liquidity > 1.1 ? "High" : "Normal";
+    let mult = volatility * liquidity;
+    // Bots
+    let botEffect = 0;
+    if (sentiment > 0.8) { mult += 0.6; botEffect += 1; logEntry("Market Maker Spoof: Bullish", "bot"); }
+    else if (sentiment < 0.2) { mult += 1.1; botEffect -= 1; logEntry("Market Maker Spoof: Bearish", "bot"); }
+    if (retail > 0.75) { mult += 0.45; botEffect += 1; logEntry("Retail FOMO wave", "retail"); }
+    else if (retail < 0.18) { mult += 0.7; botEffect -= 1; logEntry("Retail FUD sell", "retail"); }
+    // User input
+    let dir = direction || (Math.random() > 0.5 ? "up" : "down");
+    let move = ((Math.random() * 2.2 + 0.5) * mult + Math.abs(botEffect)) * (big ? 5 : 1);
+    // Liquidity: big orders can cause mega pumps/dumps
+    if (big) move *= 5 * (liquidity < 0.9 ? 1.8 : 1);
+    price += dir === "up" ? move : -move;
+    price = Math.max(price, 0.01);
+    updateCandle(move*10);
+    updateFutures();
+  }
+
+  // --- Controls/Trades ---
+  function pump() { simulateMove('up'); updateChart(); logEntry("Manual Pump", "user"); }
+  function dump() { simulateMove('down'); updateChart(); logEntry("Manual Dump", "user"); }
+  function bigOrder(type) {
+    if (type === 'buy') { simulateMove('up',1); updateChart(); logEntry("Big Market Buy!", "user"); }
+    else { simulateMove('down',1); updateChart(); logEntry("Big Market Sell!", "user"); }
+  }
+  function togglePlay() { playing = !playing; logEntry(playing?"Play":"Pause", "user"); }
+  function openTrade(type) {
+    if (futures !== "none") return;
+    futures = type;
+    entry = price;
+    liq = type === 'long' ? entry - entry/leverage : entry + entry/leverage;
+    entryDisp.textContent = entry.toFixed(2);
+    liqDisp.textContent = liq.toFixed(2);
+    pnlDisp.textContent = "0.00";
+    logEntry(`Opened ${type.toUpperCase()} @ $${entry.toFixed(2)} (liq: $${liq.toFixed(2)})`, "user");
+    liqMsgDisp.textContent = "";
+  }
+  function closeTrade() {
+    if (futures === "none") return;
+    logEntry(`Closed ${futures.toUpperCase()} @ $${price.toFixed(2)}`, "user");
+    entry = null; futures = "none"; liq = null;
+    entryDisp.textContent = "--"; liqDisp.textContent = "--";
+    pnlDisp.textContent = "0.00"; liqMsgDisp.textContent = "";
+  }
+  function updateFutures() {
+    if (futures === "none" || entry == null) return;
+    liq = futures === 'long' ? entry - entry/leverage : entry + entry/leverage;
+    const pnl = futures === 'long' ? (price-entry)*leverage : (entry-price)*leverage;
+    pnlDisp.textContent = pnl.toFixed(2);
+    if ((futures === 'long' && price <= liq) || (futures === 'short' && price >= liq)) {
+      logEntry(`☠️ Liquidated ${futures.toUpperCase()} @ $${liq.toFixed(2)}`, "liq");
+      liqMsgDisp.textContent = `Liquidated @ $${liq.toFixed(2)}`;
+      closeTrade();
+    }
+  }
+  function saveGame() {
+    localStorage.setItem('pnd_sim_save', JSON.stringify({
+      price, candles, volume, SMA, entry, futures, logs
+    }));
+    logEntry("Game saved.", "user");
+  }
+  function loadGame() {
+    const d = JSON.parse(localStorage.getItem('pnd_sim_save'));
+    if (!d) return;
+    price = d.price; candles = d.candles; volume = d.volume; SMA = d.SMA;
+    entry = d.entry; futures = d.futures; logs = d.logs || [];
+    entryDisp.textContent = entry ? entry.toFixed(2) : "--";
+    pnlDisp.textContent = "0.00"; liqDisp.textContent = "--";
+    liqMsgDisp.textContent = "";
+    updateChart();
+    logEntry("Game loaded.", "user");
+  }
+  function resetSim() {
+    price = 100; candles = []; volume = []; SMA = [];
+    entry = null; futures = "none"; logs = [];
+    entryDisp.textContent = "--"; liqDisp.textContent = "--"; pnlDisp.textContent = "0.00";
+    liqMsgDisp.textContent = ""; updateChart(); logEntry("Simulator reset.", "user");
+  }
+
+  function logEntry(msg, type) {
+    logs.unshift({ t: new Date().toLocaleTimeString(), msg, type });
+    if (logs.length > 200) logs.length = 200;
+    renderLog();
+  }
+  function renderLog() {
+    if (logPanel.style.display === 'none') return;
+    logPanel.innerHTML = `<div class='log-title'>Trades & Events</div>` +
+      logs.map(l =>
+        `<div class='log-entry log-${l.type||"user"}'>[${l.t}] ${l.msg}</div>`
+      ).join('');
+    if (autoScrollLog) logPanel.scrollTop = 0;
+  }
+  function toggleLog() {
+    logPanel.style.display = logPanel.style.display === "block" ? "none" : "block";
+    renderLog();
+  }
+
+  function togglePanels() {
+    showPanels = !showPanels;
+    controlsDiv.style.display = showPanels ? "flex" : "none";
+    hidePanelsBtn.textContent = showPanels ? "👁️ Hide Controls" : "👁️ Show Controls";
+  }
+
+  // --- UI Event Wiring ---
+  zoomSlider.oninput = () => { zoom = parseInt(zoomSlider.value); updateChart(); };
+  volSlider.oninput = () => volatility = parseFloat(volSlider.value);
+  tfSelect.oninput = () => { timeframe = parseInt(tfSelect.value); resetInterval(); };
+  smaToggle.onchange = () => { showSMA = smaToggle.checked; updateChart(); };
+
+  // --- Chart Loop ---
+  function chartLoop() { updateChart(); requestAnimationFrame(chartLoop);}
+  chartLoop();
+
+  function resetInterval() {
+    clearInterval(simLoop);
+    simLoop = setInterval(() => { if (playing) simulateMove(); }, timeframe);
+  }
+
+  // --- Initial Sim Start ---
+  function init() {
+    resizeCanvas();
+    newCandle();
+    for (let i=0; i<30; ++i) { simulateMove(); newCandle(); }
+    updateChart();
+    renderLog();
+  }
+
+  // --- Sim Loop ---
+  let simLoop = setInterval(() => { if (playing) simulateMove(); }, timeframe);
+  setInterval(() => { if (playing) newCandle(); }, 4400);
+
+  // --- Launch ---
+  init();
+
+</script>
+</body>
+</html>
