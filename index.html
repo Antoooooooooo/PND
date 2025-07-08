@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>PND Multiplayer Sim (Firebase)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    html, body { margin:0; padding:0; background:#111; color:#0f0; font-family:monospace;}
+    #chart { width:100vw; height:70vh; display:block; background:#181818; }
+    #controls { background:#101010; padding:12px 0; display:flex; flex-wrap:wrap; justify-content:space-around;}
+    button, input[type=range] { background:#191919; color:#0f0; border:1px solid #0f0; border-radius:5px; padding:6px 10px; font-size:1em;}
+    #logPanel { height:170px; overflow-y:auto; font-size:0.95em; background:#101010; border-top:1px solid #0f0; padding:6px 15px;}
+    #priceLabel { font-size:2.1em; font-weight:bold; margin:12px 0 0 18px; }
+  </style>
+  <!-- Firebase App (the core Firebase SDK) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div id="priceLabel">$100.00</div>
+  <canvas id="chart"></canvas>
+  <div id="controls">
+    <button onclick="pump()">📈 Pump</button>
+    <button onclick="dump()">📉 Dump</button>
+    <button onclick="togglePlay()">⏯ Play/Pause</button>
+    <label>Zoom: <input type="range" id="zoomSlider" min="5" max="200" value="30"></label>
+    <label>Volatility: <input type="range" id="volSlider" min="0.2" max="3" step="0.1" value="1"></label>
+    <button onclick="saveGame()">💾 Save</button>
+    <button onclick="loadGame()">📂 Load</button>
+  </div>
+  <div id="logPanel"></div>
+
+<script>
+  // ---- FIREBASE INIT ----
+  const firebaseConfig = {
+    apiKey: "AIzaSyDL2GOBKS0BlcMk0fZvPb5p0XBGUgcjoNY",
+    authDomain: "pnd-alpha.firebaseapp.com",
+    databaseURL: "https://pnd-alpha-default-rtdb.firebaseio.com/", // <<--- YOU NEED THIS!
+    projectId: "pnd-alpha",
+    storageBucket: "pnd-alpha.appspot.com",
+    messagingSenderId: "1044133114279",
+    appId: "1:1044133114279:web:bcf2cc8ab11d55b93ec682",
+    measurementId: "G-98QGS765EK"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // ---- SIM CORE STATE ----
+  let local = {price:100, candles:[], logs:[], playing:true, volatility:1, zoom:30};
+  const maxCandles = 350;
+  let userAct = false; // so your local actions don't trigger double update
+
+  // ---- DOM ----
+  const priceLabel = document.getElementById('priceLabel');
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const logPanel = document.getElementById('logPanel');
+  const zoomSlider = document.getElementById('zoomSlider');
+  const volSlider = document.getElementById('volSlider');
+
+  // ---- REALTIME SYNC ----
+  function syncToFirebase() {
+    db.ref('sim/').set({
+      price: local.price,
+      candles: local.candles,
+      logs: local.logs,
+      playing: local.playing,
+      volatility: local.volatility,
+      zoom: local.zoom,
+      updated: Date.now()
+    });
+  }
+  db.ref('sim/').on('value', (snap) => {
+    if (userAct) { userAct = false; return; }
+    const d = snap.val();
+    if (d) {
+      local.price = d.price;
+      local.candles = d.candles || [];
+      local.logs = d.logs || [];
+      local.playing = d.playing;
+      local.volatility = d.volatility;
+      local.zoom = d.zoom;
+      updateChart();
+      renderLog();
+    }
+  });
+
+  // ---- MAIN SIM LOGIC ----
+  function y(val) {
+    let range = local.price * (local.zoom/100);
+    return canvas.height - ((val - (local.price-range))/(2*range)) * canvas.height;
+  }
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight * 0.65;
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function newCandle() {
+    let c = {o:local.price, h:local.price, l:local.price, c:local.price};
+    local.candles.push(c);
+    if (local.candles.length > maxCandles) local.candles.shift();
+  }
+  function updateCandle() {
+    let c = local.candles[local.candles.length-1];
+    c.h = Math.max(c.h, local.price);
+    c.l = Math.min(c.l, local.price);
+    c.c = local.price;
+  }
+  function drawChart() {
+    resizeCanvas();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // Grid
+    ctx.strokeStyle = "#222"; ctx.lineWidth = 1; ctx.font = "13px monospace";
+    let lines = 6, range = local.price*(local.zoom/100);
+    for(let i=0;i<=lines;++i){
+      let v = local.price-range+(2*range)*(i/lines), yv=y(v);
+      ctx.beginPath(); ctx.moveTo(0,yv); ctx.lineTo(canvas.width,yv); ctx.stroke();
+      ctx.fillStyle = "#0f0"; ctx.fillText("$"+v.toFixed(2), 3, yv-2);
+    }
+    // Candles
+    const w=7, view = local.candles.slice(-Math.floor(canvas.width/w));
+    view.forEach((c,i)=>{
+      let x=i*w, col=c.c>=c.o?"#0f0":"#f00";
+      ctx.strokeStyle = col;
+      ctx.beginPath(); ctx.moveTo(x+w/2,y(c.h)); ctx.lineTo(x+w/2,y(c.l)); ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y(Math.max(c.o,c.c)), w-2, Math.max(1,Math.abs(y(c.o)-y(c.c))));
+    });
+  }
+  function updateChart(){
+    priceLabel.textContent = "$"+local.price.toFixed(2);
+    drawChart();
+  }
+  function pump(){
+    local.price += Math.random()*local.volatility*8+2;
+    updateCandle(); logEntry("Manual pump!");
+    userAct = true; syncToFirebase();
+    updateChart();
+  }
+  function dump(){
+    local.price -= Math.random()*local.volatility*8+2;
+    local.price = Math.max(local.price, 0.01);
+    updateCandle(); logEntry("Manual dump!");
+    userAct = true; syncToFirebase();
+    updateChart();
+  }
+  function togglePlay(){
+    local.playing = !local.playing;
+    userAct = true; syncToFirebase();
+  }
+  function logEntry(msg){
+    local.logs.unshift("["+new Date().toLocaleTimeString()+"] "+msg);
+    if(local.logs.length>200) local.logs.length=200;
+    renderLog();
+  }
+  function renderLog(){
+    logPanel.innerHTML = local.logs.map(l=>"<div>"+l+"</div>").join("");
+  }
+  zoomSlider.oninput = () => { local.zoom = parseInt(zoomSlider.value); userAct=true; syncToFirebase(); };
+  volSlider.oninput = () => { local.volatility = parseFloat(volSlider.value); userAct=true; syncToFirebase(); };
+  // Save/Load for local backup only
+  function saveGame() {
+    localStorage.setItem('pnd_firebase_save', JSON.stringify(local));
+    logEntry("Game saved (local only)");
+  }
+  function loadGame() {
+    const d = JSON.parse(localStorage.getItem('pnd_firebase_save'));
+    if (!d) return;
+    Object.assign(local,d);
+    userAct=true; syncToFirebase();
+    logEntry("Game loaded (local only)");
+    updateChart();
+  }
+
+  // ---- 24/7 Bot (Background Movement) ----
+  function backgroundBot() {
+    // Only one instance should run bot (otherwise will "fight")
+    db.ref('sim/').once('value').then(snap=>{
+      if (!snap.val() || Date.now()-snap.val().updated>9000) {
+        // Nobody is updating - we're the bot!
+        setInterval(()=>{
+          db.ref('sim/').once('value').then(s=>{
+            let d=s.val();
+            if (!d || !d.playing) return;
+            d.price += (Math.random()>0.5?1:-1)*(Math.random()*d.volatility*2.8+0.3);
+            if (!d.candles || !d.candles.length) d.candles=[{o:d.price,h:d.price,l:d.price,c:d.price}];
+            let c = d.candles[d.candles.length-1];
+            c.h = Math.max(c.h,d.price); c.l=Math.min(c.l,d.price); c.c=d.price;
+            db.ref('sim/').set({...d, price:d.price, candles:d.candles, updated:Date.now()});
+          });
+        }, 1800);
+      }
+    });
+  }
+
+  // ---- Sim Start ----
+  function init(){
+    resizeCanvas();
+    newCandle();
+    for(let i=0;i<28;++i){local.price += (Math.random()>0.5?1:-1)*Math.random()*7; newCandle();}
+    updateChart(); renderLog();
+    backgroundBot();
+  }
+  init();
+</script>
+</body>
+</html>
