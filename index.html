@@ -420,6 +420,55 @@
   let simLoop = setInterval(() => { if (sim.playing) simulateMove(); updateToFirebase(); }, sim.timeframe);
   setInterval(() => { if (sim.playing) newCandle(); updateToFirebase(); }, 4400);
 
+<!-- Hidden Master Login UI -->
+<div id="masterPanel" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:5000; background:#0a0a0acc; align-items:center; justify-content:center;">
+  <div style="background:#111; padding:32px 36px; border-radius:15px; border:2px solid #0f0; box-shadow:0 4px 32px #000; text-align:center;">
+    <div style="font-size:1.3em; font-weight:bold; color:#0f0; margin-bottom:18px;">MASTER LOGIN</div>
+    <input id="masterUser" type="text" placeholder="Username" style="font-size:1.1em; margin-bottom:10px; padding:8px 12px;"><br>
+    <input id="masterPass" type="password" placeholder="Password" style="font-size:1.1em; margin-bottom:16px; padding:8px 12px;"><br>
+    <button onclick="masterLogin()" style="background:#0f0; color:#111; font-weight:bold; font-size:1.1em; border-radius:8px; padding:8px 24px;">Login</button>
+    <div id="masterMsg" style="margin-top:14px; color:#f44; font-size:1em;"></div>
+  </div>
+</div>
+<script>
+let inputSeq = "";
+document.addEventListener('keydown', function(e){
+  if(document.activeElement.tagName==="INPUT") return; // Don't capture in forms
+  inputSeq += e.key.toUpperCase();
+  if(inputSeq.length > 8) inputSeq = inputSeq.substr(-8); // Only last 8 chars
+  if(inputSeq.includes("DEGEN")) {
+    document.getElementById('masterPanel').style.display = "flex";
+    inputSeq = "";
+  }
+});
+function masterLogin() {
+  const u = document.getElementById('masterUser').value.trim();
+  const p = document.getElementById('masterPass').value.trim();
+  if(u.toLowerCase()==="degen" && p==="masterdegen") {
+    document.getElementById('masterPanel').style.display = "none";
+    window.isMaster = true;
+    if(typeof enableGodMode==="function") enableGodMode();
+    else alert("God Mode enabled! You are the master.");
+  } else {
+    document.getElementById('masterMsg').textContent = "Wrong username or password.";
+    setTimeout(()=>{document.getElementById('masterMsg').textContent="";},2000);
+  }
+}
+</script>
+
+<div id="masterControls" style="display:none;">
+  <!-- Example: -->
+  <h2 style="color:#0f0">Master Control Room</h2>
+  <button onclick="setTrend('up')">Trend Up</button>
+  <button onclick="setTrend('down')">Trend Down</button>
+  <button onclick="setRange(120, 190)">Set Price Range 120-190</button>
+  <!-- More controls... -->
+</div>
+function enableGodMode() {
+  document.getElementById('masterControls').style.display = "block";
+  // Add any more logic to enable master-only features here!
+}
+
   // --- INITIALIZE ---
  function init() {
   resizeCanvas();
