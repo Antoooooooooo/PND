@@ -2,40 +2,95 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>PND Multiplayer Sim (Firebase)</title>
+  <title>PND Multiplayer Sim (Ultimate)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
-    html, body { margin:0; padding:0; background:#111; color:#0f0; font-family:monospace;}
-    #chart { width:100vw; height:70vh; display:block; background:#181818; }
-    #controls { background:#101010; padding:12px 0; display:flex; flex-wrap:wrap; justify-content:space-around;}
-    button, input[type=range] { background:#191919; color:#0f0; border:1px solid #0f0; border-radius:5px; padding:6px 10px; font-size:1em;}
-    #logPanel { height:170px; overflow-y:auto; font-size:0.95em; background:#101010; border-top:1px solid #0f0; padding:6px 15px;}
-    #priceLabel { font-size:2.1em; font-weight:bold; margin:12px 0 0 18px; }
+    html,body { margin:0; padding:0; background:#0a0a0a; color:#0f0; font-family:monospace; overflow:hidden;}
+    #main { width:100vw; height:100vh; display:flex; flex-direction:column;}
+    #chartWrap { flex:1; position:relative; min-height:60vh; background:#111; border-bottom:2px solid #222;}
+    #chart { width:100%; height:100%; display:block; background:#111;}
+    #priceLabel { position:absolute; left:12px; top:8px; background:#111b; color:#0f0; font-weight:bold; font-size:2rem; padding:4px 16px; border-radius:8px; z-index:10; border:1.5px solid #0f0; box-shadow:0 2px 6px #000c; user-select:none; letter-spacing:1px;}
+    #controls { background:#090909e6; color:#0f0; padding:12px 0 8px 0; display:flex; flex-wrap:wrap; justify-content:space-around; align-items:flex-end; box-shadow:0 -2px 12px #000e; z-index:100;}
+    .ctrl-section { margin:5px 12px; min-width:175px; max-width:235px; display:flex; flex-direction:column; align-items:flex-start; gap:7px;}
+    button,select,input[type=range],input[type=number] { background:#111; color:#0f0; border:1.3px solid #0f0; border-radius:5px; padding:7px 10px; margin:2px 0; font-size:1em; min-width:48px; font-family:monospace;}
+    button { cursor:pointer; }
+    .trade-btns button { min-width:90px; font-weight:bold; }
+    #logToggle, #hidePanels { position:absolute; right:15px; top:15px; z-index:150; background:#111; color:#0f0; border:1.5px solid #0f0; border-radius:4px; font-size:1em; padding:6px 12px; cursor:pointer; opacity:0.8; transition:0.2s;}
+    #logPanel { position:fixed; right:24px; top:60px; width:310px; height:380px; background:#060606ef; color:#0f0; border:2px solid #0f0; border-radius:12px; font-size:0.98em; box-shadow:0 6px 16px #000a; z-index:200; overflow-y:auto; display:none; padding:13px 12px 6px 12px;}
+    .log-title { font-size:1.08em; font-weight:bold; letter-spacing:1px; margin-bottom:8px; }
+    .log-entry { font-size:0.97em; margin-bottom:2.5px; }
+    .log-liq { color:#f40; font-weight:bold; }
+    .log-bot { color:#0af; }
+    .log-retail { color:#fa0; }
+    .log-user { color:#0f0; }
+    @media (max-width:900px) { #logPanel{width:97vw;right:2vw;top:6vh;height:320px;font-size:1em;} .ctrl-section{max-width:96vw;min-width:135px;} }
+    @media (max-width:750px) { #controls{flex-direction:column;gap:8px;align-items:stretch;} #logPanel{width:98vw;right:1vw;top:2vh;} }
+    @media (max-width:550px) { #main{font-size:0.98em;} #logPanel{top:2vh;font-size:1em;} }
   </style>
-  <!-- Firebase App (the core Firebase SDK) -->
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 </head>
 <body>
-  <div id="priceLabel">$100.00</div>
-  <canvas id="chart"></canvas>
+<div id="main">
+  <div id="chartWrap">
+    <canvas id="chart"></canvas>
+    <div id="priceLabel">$100.00</div>
+    <button id="logToggle" onclick="toggleLog()">🧾 Trades & Liqs</button>
+  </div>
   <div id="controls">
-    <button onclick="pump()">📈 Pump</button>
-    <button onclick="dump()">📉 Dump</button>
-    <button onclick="togglePlay()">⏯ Play/Pause</button>
-    <label>Zoom: <input type="range" id="zoomSlider" min="5" max="200" value="30"></label>
-    <label>Volatility: <input type="range" id="volSlider" min="0.2" max="3" step="0.1" value="1"></label>
-    <button onclick="saveGame()">💾 Save</button>
-    <button onclick="loadGame()">📂 Load</button>
+    <div class="ctrl-section">
+      <label>Pump & Dump:</label>
+      <button onclick="pump()">📈 Pump</button>
+      <button onclick="dump()">📉 Dump</button>
+      <button onclick="bigOrder('buy')">💰 Big Buy</button>
+      <button onclick="bigOrder('sell')">💸 Big Sell</button>
+    </div>
+    <div class="ctrl-section">
+      <label>Market Sim:</label>
+      <button onclick="togglePlay()">⏯ Play/Pause</button>
+      <label>Zoom: <input type="range" id="zoomSlider" min="5" max="200" value="25"></label>
+      <label>Volatility: <input type="range" id="volSlider" min="0.3" max="5" step="0.1" value="1"></label>
+      <label>Timeframe:
+        <select id="tfSelect">
+          <option value="700">1s</option>
+          <option value="1500">3s</option>
+          <option value="3500">7s</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="smaToggle"> Show SMA</label>
+    </div>
+    <div class="ctrl-section">
+      <label>Futures (50x):</label>
+      <div class="trade-btns">
+        <button onclick="openTrade('long')">🔼 Long</button>
+        <button onclick="openTrade('short')">🔽 Short</button>
+        <button onclick="closeTrade()">❌ Close</button>
+      </div>
+      <div>Entry: <span id="entryDisp">--</span> | Liq: <span id="liqDisp">--</span></div>
+      <div>PnL: <span id="pnlDisp">0.00</span></div>
+      <div>☠️ <span id="liqMsg"></span></div>
+    </div>
+    <div class="ctrl-section">
+      <label>Market Status:</label>
+      <div>Sentiment: <span id="sentiment">Neutral</span></div>
+      <div>Retail: <span id="retail">Stable</span></div>
+      <div>Liquidity: <span id="liquidity">Normal</span></div>
+    </div>
+    <div class="ctrl-section">
+      <button onclick="saveGame()">💾 Save</button>
+      <button onclick="loadGame()">📂 Load</button>
+      <button onclick="resetSim()">🔄 Reset</button>
+      <button id="hidePanels" onclick="togglePanels()" style="margin-top:8px;">👁️ Hide Controls</button>
+    </div>
   </div>
   <div id="logPanel"></div>
-
+</div>
 <script>
-  // ---- FIREBASE INIT ----
+  // --- FIREBASE CONFIG ---
   const firebaseConfig = {
     apiKey: "AIzaSyDL2GOBKS0BlcMk0fZvPb5p0XBGUgcjoNY",
     authDomain: "pnd-alpha.firebaseapp.com",
-    databaseURL: "https://pnd-alpha-default-rtdb.firebaseio.com/", // <<--- YOU NEED THIS!
+    databaseURL: "https://pnd-alpha-default-rtdb.firebaseio.com/", // IMPORTANT: you must include your DB url!
     projectId: "pnd-alpha",
     storageBucket: "pnd-alpha.appspot.com",
     messagingSenderId: "1044133114279",
@@ -45,163 +100,336 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // ---- SIM CORE STATE ----
-  let local = {price:100, candles:[], logs:[], playing:true, volatility:1, zoom:30};
-  const maxCandles = 350;
-  let userAct = false; // so your local actions don't trigger double update
+  // --- STATE ---
+  let sim = {
+    price: 100,
+    candles: [],
+    volume: [],
+    SMA: [],
+    logs: [],
+    entry: null,
+    futures: "none",
+    pnl: 0,
+    liq: null,
+    sentiment: 0.5,
+    retail: 0.5,
+    liquidity: 1,
+    playing: true,
+    volatility: 1,
+    zoom: 25,
+    timeframe: 700,
+    showSMA: false,
+    updated: Date.now()
+  };
+  let localOverride = false;
+  let updatePending = false;
+  let lastUpdate = Date.now();
+  const maxCandles = 340;
 
-  // ---- DOM ----
+  // --- DOM ---
   const priceLabel = document.getElementById('priceLabel');
   const canvas = document.getElementById('chart');
   const ctx = canvas.getContext('2d');
   const logPanel = document.getElementById('logPanel');
   const zoomSlider = document.getElementById('zoomSlider');
   const volSlider = document.getElementById('volSlider');
+  const tfSelect = document.getElementById('tfSelect');
+  const smaToggle = document.getElementById('smaToggle');
+  const entryDisp = document.getElementById('entryDisp');
+  const liqDisp = document.getElementById('liqDisp');
+  const pnlDisp = document.getElementById('pnlDisp');
+  const liqMsgDisp = document.getElementById('liqMsg');
+  const sentimentDisp = document.getElementById('sentiment');
+  const retailDisp = document.getElementById('retail');
+  const liquidityDisp = document.getElementById('liquidity');
+  const controlsDiv = document.getElementById('controls');
+  const hidePanelsBtn = document.getElementById('hidePanels');
 
-  // ---- REALTIME SYNC ----
-  function syncToFirebase() {
-    db.ref('sim/').set({
-      price: local.price,
-      candles: local.candles,
-      logs: local.logs,
-      playing: local.playing,
-      volatility: local.volatility,
-      zoom: local.zoom,
-      updated: Date.now()
-    });
-  }
-  db.ref('sim/').on('value', (snap) => {
-    if (userAct) { userAct = false; return; }
-    const d = snap.val();
-    if (d) {
-      local.price = d.price;
-      local.candles = d.candles || [];
-      local.logs = d.logs || [];
-      local.playing = d.playing;
-      local.volatility = d.volatility;
-      local.zoom = d.zoom;
-      updateChart();
-      renderLog();
-    }
-  });
-
-  // ---- MAIN SIM LOGIC ----
+  // --- UTIL ---
   function y(val) {
-    let range = local.price * (local.zoom/100);
-    return canvas.height - ((val - (local.price-range))/(2*range)) * canvas.height;
+    let range = sim.price * (sim.zoom / 100);
+    return canvas.height - ((val - (sim.price - range)) / (2 * range)) * canvas.height;
   }
   function resizeCanvas() {
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight * 0.65;
+    canvas.height = document.getElementById('chartWrap').offsetHeight;
   }
-  window.addEventListener('resize', resizeCanvas);
 
-  function newCandle() {
-    let c = {o:local.price, h:local.price, l:local.price, c:local.price};
-    local.candles.push(c);
-    if (local.candles.length > maxCandles) local.candles.shift();
-  }
-  function updateCandle() {
-    let c = local.candles[local.candles.length-1];
-    c.h = Math.max(c.h, local.price);
-    c.l = Math.min(c.l, local.price);
-    c.c = local.price;
-  }
-  function drawChart() {
-    resizeCanvas();
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    // Grid
-    ctx.strokeStyle = "#222"; ctx.lineWidth = 1; ctx.font = "13px monospace";
-    let lines = 6, range = local.price*(local.zoom/100);
-    for(let i=0;i<=lines;++i){
-      let v = local.price-range+(2*range)*(i/lines), yv=y(v);
-      ctx.beginPath(); ctx.moveTo(0,yv); ctx.lineTo(canvas.width,yv); ctx.stroke();
-      ctx.fillStyle = "#0f0"; ctx.fillText("$"+v.toFixed(2), 3, yv-2);
+  // --- CHART DRAW ---
+  function drawGrid() {
+    ctx.strokeStyle = '#233'; ctx.lineWidth = 1;
+    ctx.font = "13px monospace";
+    let lines = 6;
+    let range = sim.price * (sim.zoom / 100);
+    for (let i = 0; i <= lines; ++i) {
+      let v = sim.price - range + (2 * range) * (i / lines);
+      let yv = y(v);
+      ctx.beginPath();
+      ctx.moveTo(0, yv); ctx.lineTo(canvas.width, yv); ctx.stroke();
+      ctx.fillStyle = "#0f0"; ctx.fillText("$" + v.toFixed(2), 3, yv - 2);
     }
-    // Candles
-    const w=7, view = local.candles.slice(-Math.floor(canvas.width/w));
-    view.forEach((c,i)=>{
-      let x=i*w, col=c.c>=c.o?"#0f0":"#f00";
+  }
+  function drawCandles() {
+    const w = 7;
+    const view = sim.candles.slice(-Math.floor(canvas.width / w));
+    view.forEach((c, i) => {
+      const x = i * w;
+      const col = c.c >= c.o ? "#0f0" : "#f00";
       ctx.strokeStyle = col;
-      ctx.beginPath(); ctx.moveTo(x+w/2,y(c.h)); ctx.lineTo(x+w/2,y(c.l)); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + w/2, y(c.h));
+      ctx.lineTo(x + w/2, y(c.l));
+      ctx.stroke();
       ctx.fillStyle = col;
-      ctx.fillRect(x, y(Math.max(c.o,c.c)), w-2, Math.max(1,Math.abs(y(c.o)-y(c.c))));
+      ctx.fillRect(x, y(Math.max(c.o, c.c)), w-2, Math.max(1, Math.abs(y(c.o) - y(c.c))));
     });
   }
-  function updateChart(){
-    priceLabel.textContent = "$"+local.price.toFixed(2);
-    drawChart();
+  function drawVolume() {
+    const w = 7;
+    const view = sim.volume.slice(-Math.floor(canvas.width / w));
+    view.forEach((v, i) => {
+      const x = i * w;
+      ctx.fillStyle = v.color;
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(x, canvas.height - 26, w-2, -v.v/2);
+      ctx.globalAlpha = 1.0;
+    });
   }
-  function pump(){
-    local.price += Math.random()*local.volatility*8+2;
-    updateCandle(); logEntry("Manual pump!");
-    userAct = true; syncToFirebase();
-    updateChart();
+  function drawSMA() {
+    if (!sim.showSMA) return;
+    ctx.strokeStyle = "#0fa";
+    ctx.beginPath();
+    let w = 7;
+    const view = sim.SMA.slice(-Math.floor(canvas.width / w));
+    view.forEach((s, i) => {
+      const x = i * w + w/2;
+      if (i === 0) ctx.moveTo(x, y(s));
+      else ctx.lineTo(x, y(s));
+    });
+    ctx.stroke();
   }
-  function dump(){
-    local.price -= Math.random()*local.volatility*8+2;
-    local.price = Math.max(local.price, 0.01);
-    updateCandle(); logEntry("Manual dump!");
-    userAct = true; syncToFirebase();
-    updateChart();
+  function updateChart() {
+    resizeCanvas();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+    drawVolume();
+    drawCandles();
+    drawSMA();
+    priceLabel.textContent = "$" + sim.price.toFixed(2);
   }
-  function togglePlay(){
-    local.playing = !local.playing;
-    userAct = true; syncToFirebase();
+
+  // --- CANDLE ENGINE ---
+  function newCandle(vol=0) {
+    let c = { o: sim.price, h: sim.price, l: sim.price, c: sim.price };
+    sim.candles.push(c);
+    sim.volume.push({ v: vol, color: "#0f0" });
+    if (sim.candles.length > maxCandles) sim.candles.shift(), sim.volume.shift();
+    updateSMA();
   }
-  function logEntry(msg){
-    local.logs.unshift("["+new Date().toLocaleTimeString()+"] "+msg);
-    if(local.logs.length>200) local.logs.length=200;
+  function updateCandle(vol=0) {
+    let c = sim.candles[sim.candles.length-1];
+    c.h = Math.max(c.h, sim.price);
+    c.l = Math.min(c.l, sim.price);
+    c.c = sim.price;
+    sim.volume[sim.volume.length-1].v += vol;
+  }
+  function updateSMA() {
+    let N = 12;
+    let sum = 0;
+    let arr = sim.candles.slice(-N);
+    if (arr.length < N) { sim.SMA.push(sim.price); return; }
+    for (let i=0; i<N; ++i) sum += arr[i].c;
+    sim.SMA.push(sum/N);
+    if (sim.SMA.length > maxCandles) sim.SMA.shift();
+  }
+
+  // --- LOGIC ---
+  function simulateMove(direction=null, big=0) {
+    if (!sim.playing) return;
+    // Sentiment, retail, spoof, liquidity
+    sim.sentiment = Math.random();
+    sim.retail = Math.random();
+    sim.liquidity = 1 + (Math.random()-0.5)*0.6;
+    sentimentDisp.textContent = sim.sentiment > 0.7 ? "Bullish 🟢" : sim.sentiment < 0.3 ? "Bearish 🔴" : "Neutral";
+    retailDisp.textContent = sim.retail > 0.7 ? "FOMO 🟢" : sim.retail < 0.3 ? "FUD 🔴" : "Stable";
+    liquidityDisp.textContent = sim.liquidity < 0.9 ? "Low" : sim.liquidity > 1.1 ? "High" : "Normal";
+    let mult = sim.volatility * sim.liquidity;
+    // Bots
+    let botEffect = 0;
+    if (sim.sentiment > 0.8) { mult += 0.6; botEffect += 1; logEntry("Market Maker Spoof: Bullish", "bot"); }
+    else if (sim.sentiment < 0.2) { mult += 1.1; botEffect -= 1; logEntry("Market Maker Spoof: Bearish", "bot"); }
+    if (sim.retail > 0.75) { mult += 0.45; botEffect += 1; logEntry("Retail FOMO wave", "retail"); }
+    else if (sim.retail < 0.18) { mult += 0.7; botEffect -= 1; logEntry("Retail FUD sell", "retail"); }
+    // User input
+    let dir = direction || (Math.random() > 0.5 ? "up" : "down");
+    let move = ((Math.random() * 2.2 + 0.5) * mult + Math.abs(botEffect)) * (big ? 5 : 1);
+    // Liquidity: big orders can cause mega pumps/dumps
+    if (big) move *= 5 * (sim.liquidity < 0.9 ? 1.8 : 1);
+    sim.price += dir === "up" ? move : -move;
+    sim.price = Math.max(sim.price, 0.01);
+    updateCandle(move*10);
+    updateFutures();
+  }
+
+  // --- TRADING/FUTURES ---
+  function openTrade(type) {
+    if (sim.futures !== "none") return;
+    sim.futures = type;
+    sim.entry = sim.price;
+    sim.liq = type === 'long' ? sim.entry - sim.entry/50 : sim.entry + sim.entry/50;
+    entryDisp.textContent = sim.entry.toFixed(2);
+    liqDisp.textContent = sim.liq.toFixed(2);
+    pnlDisp.textContent = "0.00";
+    logEntry(`Opened ${type.toUpperCase()} @ $${sim.entry.toFixed(2)} (liq: $${sim.liq.toFixed(2)})`, "user");
+    liqMsgDisp.textContent = "";
+    updateToFirebase();
+  }
+  function closeTrade() {
+    if (sim.futures === "none") return;
+    logEntry(`Closed ${sim.futures.toUpperCase()} @ $${sim.price.toFixed(2)}`, "user");
+    sim.entry = null; sim.futures = "none"; sim.liq = null;
+    entryDisp.textContent = "--"; liqDisp.textContent = "--";
+    pnlDisp.textContent = "0.00"; liqMsgDisp.textContent = "";
+    updateToFirebase();
+  }
+  function updateFutures() {
+    if (sim.futures === "none" || sim.entry == null) return;
+    sim.liq = sim.futures === 'long' ? sim.entry - sim.entry/50 : sim.entry + sim.entry/50;
+    const pnl = sim.futures === 'long' ? (sim.price-sim.entry)*50 : (sim.entry-sim.price)*50;
+    pnlDisp.textContent = pnl.toFixed(2);
+    if ((sim.futures === 'long' && sim.price <= sim.liq) || (sim.futures === 'short' && sim.price >= sim.liq)) {
+      logEntry(`☠️ Liquidated ${sim.futures.toUpperCase()} @ $${sim.liq.toFixed(2)}`, "liq");
+      liqMsgDisp.textContent = `Liquidated @ $${sim.liq.toFixed(2)}`;
+      closeTrade();
+    }
+  }
+
+  // --- UI ---
+  function pump() { simulateMove('up'); updateChart(); logEntry("Manual Pump", "user"); updateToFirebase();}
+  function dump() { simulateMove('down'); updateChart(); logEntry("Manual Dump", "user"); updateToFirebase();}
+  function bigOrder(type) {
+    if (type === 'buy') { simulateMove('up',1); updateChart(); logEntry("Big Market Buy!", "user"); }
+    else { simulateMove('down',1); updateChart(); logEntry("Big Market Sell!", "user"); }
+    updateToFirebase();
+  }
+  function togglePlay() { sim.playing = !sim.playing; logEntry(sim.playing?"Play":"Pause", "user"); updateToFirebase();}
+  function logEntry(msg, type) {
+    sim.logs.unshift({ t: new Date().toLocaleTimeString(), msg, type });
+    if (sim.logs.length > 250) sim.logs.length = 250;
     renderLog();
   }
-  function renderLog(){
-    logPanel.innerHTML = local.logs.map(l=>"<div>"+l+"</div>").join("");
+  function renderLog() {
+    if (logPanel.style.display === 'none') return;
+    logPanel.innerHTML = `<div class='log-title'>Trades & Events</div>` +
+      sim.logs.map(l =>
+        `<div class='log-entry log-${l.type||"user"}'>[${l.t}] ${l.msg}</div>`
+      ).join('');
+    logPanel.scrollTop = 0;
   }
-  zoomSlider.oninput = () => { local.zoom = parseInt(zoomSlider.value); userAct=true; syncToFirebase(); };
-  volSlider.oninput = () => { local.volatility = parseFloat(volSlider.value); userAct=true; syncToFirebase(); };
-  // Save/Load for local backup only
+  function toggleLog() {
+    logPanel.style.display = logPanel.style.display === "block" ? "none" : "block";
+    renderLog();
+  }
+  function togglePanels() {
+    controlsDiv.style.display = controlsDiv.style.display==="flex" ? "none" : "flex";
+    hidePanelsBtn.textContent = controlsDiv.style.display==="flex" ? "👁️ Hide Controls" : "👁️ Show Controls";
+  }
+  zoomSlider.oninput = () => { sim.zoom = parseInt(zoomSlider.value); updateChart(); updateToFirebase();}
+  volSlider.oninput = () => { sim.volatility = parseFloat(volSlider.value); updateToFirebase();}
+  tfSelect.oninput = () => { sim.timeframe = parseInt(tfSelect.value); resetSimLoop(); updateToFirebase();}
+  smaToggle.onchange = () => { sim.showSMA = smaToggle.checked; updateChart(); updateToFirebase();}
+
   function saveGame() {
-    localStorage.setItem('pnd_firebase_save', JSON.stringify(local));
-    logEntry("Game saved (local only)");
+    localStorage.setItem('pnd_sim_save', JSON.stringify(sim));
+    logEntry("Game saved.", "user");
   }
   function loadGame() {
-    const d = JSON.parse(localStorage.getItem('pnd_firebase_save'));
+    const d = JSON.parse(localStorage.getItem('pnd_sim_save'));
     if (!d) return;
-    Object.assign(local,d);
-    userAct=true; syncToFirebase();
-    logEntry("Game loaded (local only)");
-    updateChart();
+    Object.assign(sim,d);
+    entryDisp.textContent = sim.entry ? sim.entry.toFixed(2) : "--";
+    pnlDisp.textContent = "0.00"; liqDisp.textContent = "--";
+    liqMsgDisp.textContent = "";
+    updateChart(); logEntry("Game loaded.", "user");
+    updateToFirebase();
+  }
+  function resetSim() {
+    sim.price = 100; sim.candles = []; sim.volume = []; sim.SMA = [];
+    sim.entry = null; sim.futures = "none"; sim.logs = [];
+    entryDisp.textContent = "--"; liqDisp.textContent = "--"; pnlDisp.textContent = "0.00";
+    liqMsgDisp.textContent = ""; updateChart(); logEntry("Simulator reset.", "user");
+    updateToFirebase();
   }
 
-  // ---- 24/7 Bot (Background Movement) ----
+  // --- FIREBASE SYNC ---
+  function updateToFirebase() {
+    sim.updated = Date.now();
+    localOverride = true;
+    db.ref('sim/').set(sim);
+  }
+  db.ref('sim/').on('value', snap => {
+    if (localOverride) { localOverride=false; return; }
+    const d = snap.val(); if (!d) return;
+    // Only update if not stale
+    if (d.updated && d.updated > lastUpdate) {
+      Object.assign(sim, d);
+      updateChart();
+      renderLog();
+      entryDisp.textContent = sim.entry ? sim.entry.toFixed(2) : "--";
+      liqDisp.textContent = sim.liq ? sim.liq.toFixed(2) : "--";
+      pnlDisp.textContent = "0.00";
+      liqMsgDisp.textContent = "";
+      sentimentDisp.textContent = sim.sentiment > 0.7 ? "Bullish 🟢" : sim.sentiment < 0.3 ? "Bearish 🔴" : "Neutral";
+      retailDisp.textContent = sim.retail > 0.7 ? "FOMO 🟢" : sim.retail < 0.3 ? "FUD 🔴" : "Stable";
+      liquidityDisp.textContent = sim.liquidity < 0.9 ? "Low" : sim.liquidity > 1.1 ? "High" : "Normal";
+      lastUpdate = d.updated;
+    }
+  });
+
+  // --- 24/7 BOT ---
   function backgroundBot() {
-    // Only one instance should run bot (otherwise will "fight")
-    db.ref('sim/').once('value').then(snap=>{
-      if (!snap.val() || Date.now()-snap.val().updated>9000) {
-        // Nobody is updating - we're the bot!
-        setInterval(()=>{
-          db.ref('sim/').once('value').then(s=>{
-            let d=s.val();
-            if (!d || !d.playing) return;
-            d.price += (Math.random()>0.5?1:-1)*(Math.random()*d.volatility*2.8+0.3);
-            if (!d.candles || !d.candles.length) d.candles=[{o:d.price,h:d.price,l:d.price,c:d.price}];
-            let c = d.candles[d.candles.length-1];
-            c.h = Math.max(c.h,d.price); c.l=Math.min(c.l,d.price); c.c=d.price;
-            db.ref('sim/').set({...d, price:d.price, candles:d.candles, updated:Date.now()});
-          });
-        }, 1800);
-      }
-    });
+    setInterval(()=>{
+      db.ref('sim/').once('value').then(s=>{
+        let d=s.val();
+        if (!d || !d.playing) return;
+        // Only run if not updated in last 6s
+        if (!d.updated || Date.now()-d.updated>6000) {
+          d.price += (Math.random()>0.5?1:-1)*(Math.random()*d.volatility*2.6+0.3);
+          if (!d.candles || !d.candles.length) d.candles=[{o:d.price,h:d.price,l:d.price,c:d.price}];
+          let c = d.candles[d.candles.length-1];
+          c.h = Math.max(c.h,d.price); c.l=Math.min(c.l,d.price); c.c=d.price;
+          d.logs = d.logs||[];
+          d.logs.unshift({ t: new Date().toLocaleTimeString(), msg:"Idle background move", type:"bot"});
+          if (d.logs.length>250) d.logs.length=250;
+          d.updated=Date.now();
+          db.ref('sim/').set(d);
+        }
+      });
+    }, 1800);
   }
 
-  // ---- Sim Start ----
-  function init(){
+  // --- CHART LOOP ---
+  function chartLoop() { updateChart(); requestAnimationFrame(chartLoop);}
+  chartLoop();
+
+  // --- MAIN SIM ---
+  function resetSimLoop() {
+    clearInterval(simLoop);
+    simLoop = setInterval(() => { if (sim.playing) simulateMove(); updateToFirebase(); }, sim.timeframe);
+  }
+  let simLoop = setInterval(() => { if (sim.playing) simulateMove(); updateToFirebase(); }, sim.timeframe);
+  setInterval(() => { if (sim.playing) newCandle(); updateToFirebase(); }, 4400);
+
+  // --- INITIALIZE ---
+  function init() {
     resizeCanvas();
     newCandle();
-    for(let i=0;i<28;++i){local.price += (Math.random()>0.5?1:-1)*Math.random()*7; newCandle();}
-    updateChart(); renderLog();
+    for (let i=0; i<30; ++i) { simulateMove(); newCandle(); }
+    updateChart();
+    renderLog();
     backgroundBot();
   }
+  window.addEventListener('resize', resizeCanvas);
   init();
 </script>
 </body>
