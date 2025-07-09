@@ -23,6 +23,9 @@
     .log-bot { color:#0af; }
     .log-retail { color:#fa0; }
     .log-user { color:#0f0; }
+    #masterControls { display:none; position:fixed; top:22px; left:22px; z-index:9999; background:#222; color:#0f0; padding:24px 26px 18px 26px; border:2px solid #0f0; border-radius:12px; box-shadow:0 8px 32px #000e; }
+    #masterControls h2 { color:#0f0; margin-top:0; margin-bottom:16px; }
+    #masterControls button { margin-right:12px; margin-bottom:8px; }
     @media (max-width:900px) { #logPanel{width:97vw;right:2vw;top:6vh;height:320px;font-size:1em;} .ctrl-section{max-width:96vw;min-width:135px;} }
     @media (max-width:750px) { #controls{flex-direction:column;gap:8px;align-items:stretch;} #logPanel{width:98vw;right:1vw;top:2vh;} }
     @media (max-width:550px) { #main{font-size:0.98em;} #logPanel{top:2vh;font-size:1em;} }
@@ -31,6 +34,25 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 </head>
 <body>
+
+<!-- MASTER MODAL and MASTER PANEL -->
+<div id="masterPanel" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:5000; background:#0a0a0acc; align-items:center; justify-content:center;">
+  <div style="background:#111; padding:32px 36px; border-radius:15px; border:2px solid #0f0; box-shadow:0 4px 32px #000; text-align:center;">
+    <div style="font-size:1.3em; font-weight:bold; color:#0f0; margin-bottom:18px;">MASTER LOGIN</div>
+    <input id="masterUser" type="text" placeholder="Username" style="font-size:1.1em; margin-bottom:10px; padding:8px 12px;"><br>
+    <input id="masterPass" type="password" placeholder="Password" style="font-size:1.1em; margin-bottom:16px; padding:8px 12px;"><br>
+    <button onclick="masterLogin()" style="background:#0f0; color:#111; font-weight:bold; font-size:1.1em; border-radius:8px; padding:8px 24px;">Login</button>
+    <div id="masterMsg" style="margin-top:14px; color:#f44; font-size:1em;"></div>
+  </div>
+</div>
+<div id="masterControls">
+  <h2>Master Control Room</h2>
+  <button onclick="setTrend('up')">Trend Up</button>
+  <button onclick="setTrend('down')">Trend Down</button>
+  <button onclick="setRange(120,190)">Set Range 120-190</button>
+  <!-- Add more God Mode controls here -->
+</div>
+
 <div id="main">
   <div id="chartWrap">
     <canvas id="chart"></canvas>
@@ -85,6 +107,41 @@
   </div>
   <div id="logPanel"></div>
 </div>
+
+<script>
+/* ---------- MASTER LOGIN CODE ----------- */
+let inputSeq = "";
+document.addEventListener('keydown', function(e){
+  if(document.activeElement.tagName==="INPUT") return; // Don't capture in forms
+  inputSeq += e.key.toUpperCase();
+  if(inputSeq.length > 8) inputSeq = inputSeq.substr(-8); // Only last 8 chars
+  if(inputSeq.includes("DEGEN")) {
+    document.getElementById('masterPanel').style.display = "flex";
+    inputSeq = "";
+  }
+});
+function masterLogin() {
+  const u = document.getElementById('masterUser').value.trim();
+  const p = document.getElementById('masterPass').value.trim();
+  if(u.toLowerCase()==="degen" && p==="masterdegen") {
+    document.getElementById('masterPanel').style.display = "none";
+    window.isMaster = true;
+    enableGodMode();
+  } else {
+    document.getElementById('masterMsg').textContent = "Wrong username or password.";
+    setTimeout(()=>{document.getElementById('masterMsg').textContent="";},2000);
+  }
+}
+function enableGodMode() {
+  document.getElementById('masterControls').style.display = "block";
+  // You can wire up more master-only UI/logic here.
+}
+// Dummy functions for now (replace these with your logic)
+function setTrend(dir) { alert("Trend set: " + dir + " (Wire this up to your sim state!)"); }
+function setRange(min, max) { alert("Price range set: " + min + "-" + max + " (Wire this up to your sim state!)"); }
+/* --------- END MASTER LOGIN CODE -------- */
+</script>
+
 <script>
   // --- FIREBASE CONFIG ---
   const firebaseConfig = {
@@ -420,76 +477,15 @@
   let simLoop = setInterval(() => { if (sim.playing) simulateMove(); updateToFirebase(); }, sim.timeframe);
   setInterval(() => { if (sim.playing) newCandle(); updateToFirebase(); }, 4400);
 
-<!-- Hidden Master Login UI -->
-<div id="masterPanel" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:5000; background:#0a0a0acc; align-items:center; justify-content:center;">
-  <div style="background:#111; padding:32px 36px; border-radius:15px; border:2px solid #0f0; box-shadow:0 4px 32px #000; text-align:center;">
-    <div style="font-size:1.3em; font-weight:bold; color:#0f0; margin-bottom:18px;">MASTER LOGIN</div>
-    <input id="masterUser" type="text" placeholder="Username" style="font-size:1.1em; margin-bottom:10px; padding:8px 12px;"><br>
-    <input id="masterPass" type="password" placeholder="Password" style="font-size:1.1em; margin-bottom:16px; padding:8px 12px;"><br>
-    <button onclick="masterLogin()" style="background:#0f0; color:#111; font-weight:bold; font-size:1.1em; border-radius:8px; padding:8px 24px;">Login</button>
-    <div id="masterMsg" style="margin-top:14px; color:#f44; font-size:1em;"></div>
-  </div>
-</div>
-<script>
-let inputSeq = "";
-document.addEventListener('keydown', function(e){
-  if(document.activeElement.tagName==="INPUT") return; // Don't capture in forms
-  inputSeq += e.key.toUpperCase();
-  if(inputSeq.length > 8) inputSeq = inputSeq.substr(-8); // Only last 8 chars
-  if(inputSeq.includes("DEGEN")) {
-    document.getElementById('masterPanel').style.display = "flex";
-    inputSeq = "";
-  }
-});
-function masterLogin() {
-  const u = document.getElementById('masterUser').value.trim();
-  const p = document.getElementById('masterPass').value.trim();
-  if(u.toLowerCase()==="degen" && p==="masterdegen") {
-    document.getElementById('masterPanel').style.display = "none";
-    window.isMaster = true;
-    if(typeof enableGodMode==="function") enableGodMode();
-    else alert("God Mode enabled! You are the master.");
-  } else {
-    document.getElementById('masterMsg').textContent = "Wrong username or password.";
-    setTimeout(()=>{document.getElementById('masterMsg').textContent="";},2000);
-  }
-}
-</script>
-
-<div id="masterControls" style="display:none;">
-  <!-- Example: -->
-  <h2 style="color:#0f0">Master Control Room</h2>
-  <button onclick="setTrend('up')">Trend Up</button>
-  <button onclick="setTrend('down')">Trend Down</button>
-  <button onclick="setRange(120, 190)">Set Price Range 120-190</button>
-  <!-- More controls... -->
-</div>
-function enableGodMode() {
-  document.getElementById('masterControls').style.display = "block";
-  // Add any more logic to enable master-only features here!
-}
-
   // --- INITIALIZE ---
- function init() {
-  resizeCanvas();
-  // Load existing state from Firebase, or initialize only if missing
-  db.ref('sim/').once('value').then(snap => {
-    const d = snap.val();
-    if (d && d.price) {
-      Object.assign(sim, d);
-      updateChart();
-      renderLog();
-    } else {
-      // Only initialize if no data yet
-      newCandle();
-      for (let i = 0; i < 30; ++i) { simulateMove(); newCandle(); }
-      updateChart();
-      renderLog();
-      updateToFirebase();
-    }
+  function init() {
+    resizeCanvas();
+    newCandle();
+    for (let i=0; i<30; ++i) { simulateMove(); newCandle(); }
+    updateChart();
+    renderLog();
     backgroundBot();
-  });
-}
+  }
   window.addEventListener('resize', resizeCanvas);
   init();
 </script>
