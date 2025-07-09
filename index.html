@@ -421,14 +421,26 @@
   setInterval(() => { if (sim.playing) newCandle(); updateToFirebase(); }, 4400);
 
   // --- INITIALIZE ---
-  function init() {
-    resizeCanvas();
-    newCandle();
-    for (let i=0; i<30; ++i) { simulateMove(); newCandle(); }
-    updateChart();
-    renderLog();
+ function init() {
+  resizeCanvas();
+  // Load existing state from Firebase, or initialize only if missing
+  db.ref('sim/').once('value').then(snap => {
+    const d = snap.val();
+    if (d && d.price) {
+      Object.assign(sim, d);
+      updateChart();
+      renderLog();
+    } else {
+      // Only initialize if no data yet
+      newCandle();
+      for (let i = 0; i < 30; ++i) { simulateMove(); newCandle(); }
+      updateChart();
+      renderLog();
+      updateToFirebase();
+    }
     backgroundBot();
-  }
+  });
+}
   window.addEventListener('resize', resizeCanvas);
   init();
 </script>
